@@ -1,0 +1,606 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tinker — a background coding agent</title>
+    <meta
+      name="description"
+      content="Tinker is a background coding agent. Give it a prompt, walk away, get results."
+    />
+
+    <!-- Favicons (copy these PNGs from the tinker repo's internal/web/public/
+         folder into the same directory as this file when deploying.) -->
+    <link rel="icon" type="image/x-icon" href="./static/favicon.ico" />
+    <link rel="icon" type="image/png" sizes="192x192" href="./static/icon-192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="./static/icon-512.png" />
+    <link rel="apple-touch-icon" href="./static/apple-touch-icon.png" />
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="tinker" />
+    <meta
+      property="og:description"
+      content="A background coding agent. Give it a prompt, walk away, get results."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="./icon-512.png" />
+
+    <!-- Fonts: Inter (display + UI) and Fira Mono (code) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fira+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <style>
+      /* ============================================================
+         Design tokens — mirrored from internal/web/src/app.css
+         ============================================================ */
+      :root {
+        --green-100: #7fee64;
+        --green-light: #ddffdc;
+        --green-30: rgba(127, 238, 100, 0.3);
+
+        --gray-dark: #2f2f2f;
+        --gray-muted: #a3a3a3;
+
+        --black: #000000;
+        --ground: #181818;
+        --white: #ffffff;
+
+        --color-action-primary: var(--green-100);
+
+        --color-surface-deep: var(--black);
+        --color-surface-base: var(--ground);
+        --color-surface-raised: var(--ground);
+
+        --color-border-subtle: rgba(255, 255, 255, 0.1);
+        --color-border-accent: rgba(221, 255, 220, 0.3);
+
+        --color-text-primary: var(--white);
+        --color-text-body: var(--green-light);
+        --color-text-link: var(--green-light);
+        --color-text-secondary: rgba(221, 255, 220, 0.6);
+        --color-text-tertiary: rgba(221, 255, 220, 0.45);
+        --color-text-muted-neutral: var(--gray-muted);
+
+        --color-row-hover: rgba(255, 255, 255, 0.06);
+        --color-accent-tint: rgba(127, 238, 100, 0.1);
+        --color-accent-tint-soft: rgba(127, 238, 100, 0.08);
+
+        --radius-sm: 4px;
+        --radius-md: 6px;
+        --radius-lg: 8px;
+        --radius-xl: 12px;
+        --radius-full: 9999px;
+
+        --space-1: 4px;
+        --space-2: 8px;
+        --space-3: 12px;
+        --space-4: 16px;
+        --space-5: 20px;
+        --space-6: 24px;
+        --space-8: 32px;
+        --space-10: 40px;
+
+        --motion-duration: 300ms;
+        --motion-duration-fast: 150ms;
+        --motion-ease: cubic-bezier(0.4, 0, 0.2, 1);
+
+        --font-family-display: "Inter", system-ui, -apple-system, sans-serif;
+        --font-family-ui: "Inter", system-ui, -apple-system, sans-serif;
+        --font-family-code: "Fira Mono", ui-monospace, "SF Mono", Consolas,
+          monospace;
+      }
+
+      *,
+      *::before,
+      *::after {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        min-height: 100%;
+      }
+
+      body {
+        font-family: var(--font-family-ui);
+        background: var(--color-surface-deep);
+        color: var(--color-text-body);
+        -webkit-font-smoothing: antialiased;
+        letter-spacing: -0.01em;
+        line-height: 1.55;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+        transition: color var(--motion-duration-fast) var(--motion-ease);
+      }
+      a:hover {
+        color: var(--color-action-primary);
+      }
+
+      :focus-visible {
+        outline: none;
+        box-shadow: 0 0 0 3px var(--green-30);
+        border-radius: var(--radius-md);
+      }
+
+      .font-code {
+        font-family: var(--font-family-code);
+      }
+
+      /* ============================================================
+         Page shell
+         ============================================================ */
+      .page {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: var(--space-10) var(--space-6) var(--space-8);
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-10);
+      }
+
+      /* Brand mark */
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-3);
+        align-self: flex-start;
+      }
+      .brand__icon {
+        width: 22px;
+        height: 22px;
+        border-radius: var(--radius-md);
+        object-fit: cover;
+        display: block;
+      }
+      .brand__wordmark {
+        font-family: var(--font-family-display);
+        font-size: 0.98rem;
+        font-weight: 600;
+        color: var(--color-text-body);
+        letter-spacing: -0.01em;
+      }
+
+      /* Hero */
+      .hero {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-5);
+      }
+      .hero__title {
+        font-family: var(--font-family-display);
+        color: var(--color-text-primary);
+        font-size: clamp(2rem, 5vw, 2.75rem);
+        font-weight: 600;
+        line-height: 1.1;
+        letter-spacing: -0.02em;
+      }
+      .hero__lede {
+        color: var(--color-text-secondary);
+        font-size: 1.0625rem;
+        max-width: 56ch;
+      }
+
+      /* ============================================================
+         Session — replicates the screenshot of a real Tinker thread.
+         Class names + styles ported from
+         internal/web/src/components/StepTrace.svelte.
+         ============================================================ */
+      .session {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-5);
+        padding: var(--space-6);
+        background: var(--color-surface-base);
+        border: 1px solid var(--color-border-subtle);
+        border-radius: var(--radius-xl);
+      }
+
+      /* System prompt — collapsed, tertiary, uppercase */
+      .trace-row--system {
+        font-size: 0.7rem;
+        color: var(--color-text-tertiary);
+        padding-left: var(--space-1);
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-1);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .trace-row--system svg {
+        flex-shrink: 0;
+      }
+
+      /* Chat row — avatar + bubble */
+      .msg-row {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--space-3);
+        width: 100%;
+      }
+      .msg-row.is-user {
+        flex-direction: row-reverse;
+      }
+
+      .msg-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: var(--radius-full);
+        flex-shrink: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.74rem;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        border: 1px solid var(--color-border-subtle);
+        background: var(--color-surface-raised);
+        color: var(--color-text-primary);
+        overflow: hidden;
+      }
+      .msg-avatar.is-agent {
+        background: transparent;
+        border-color: transparent;
+      }
+      .msg-avatar.is-user {
+        background: var(--color-action-primary);
+        color: var(--black);
+        border-color: var(--color-action-primary);
+      }
+      .msg-avatar img {
+        width: 100%;
+        height: 100%;
+        display: block;
+        object-fit: cover;
+      }
+
+      .msg-bubble {
+        max-width: calc(100% - 44px);
+        padding: var(--space-4) var(--space-5);
+        border-radius: var(--radius-lg);
+        font-family: var(--font-family-ui);
+        font-size: 0.88rem;
+        line-height: 1.6;
+        word-break: break-word;
+        border: 1px solid var(--color-border-subtle);
+        background: var(--ground);
+      }
+      .msg-bubble.is-user {
+        background: var(--color-accent-tint-soft);
+        border-color: var(--green-30);
+      }
+      .msg-bubble code {
+        font-family: var(--font-family-code);
+        font-size: 0.82em;
+        background: var(--color-surface-raised);
+        border: 1px solid var(--color-border-subtle);
+        border-radius: var(--radius-sm);
+        padding: 1px 5px;
+      }
+      .msg-bubble.is-user .font-code {
+        font-family: var(--font-family-code);
+        font-size: 0.86em;
+      }
+
+      /* Trace row — tool invocation */
+      .trace-row {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--space-2);
+        padding-left: var(--space-1);
+        font-family: var(--font-family-code);
+        font-size: 0.75rem;
+        line-height: 1.55;
+      }
+      .trace-row__icon {
+        margin-top: 2px;
+        flex-shrink: 0;
+      }
+      .trace-row__body {
+        flex: 1;
+        word-break: break-all;
+      }
+      .trace-row__toggle {
+        display: block;
+        margin-top: 4px;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        font-size: 0.7rem;
+        color: var(--color-text-tertiary);
+        font-family: inherit;
+        padding: 0;
+        transition: color var(--motion-duration-fast) var(--motion-ease);
+      }
+      .trace-row__toggle:hover {
+        color: var(--color-action-primary);
+        text-decoration: underline;
+        text-underline-offset: 2px;
+      }
+      .trace-row--tool {
+        color: var(--color-text-secondary);
+        border-left: 2px solid var(--color-border-subtle);
+        padding-left: 10px;
+        margin-left: 0;
+      }
+
+      /* Link row */
+      .links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-5);
+        font-size: 0.9375rem;
+      }
+      .links a {
+        color: var(--color-action-primary);
+      }
+      .links a:hover {
+        text-decoration: underline;
+        text-underline-offset: 3px;
+      }
+
+      /* Footer */
+      .footer {
+        color: var(--color-text-tertiary);
+        font-size: 0.8125rem;
+        display: flex;
+        align-items: center;
+        gap: var(--space-3);
+      }
+      .footer a {
+        display: inline-flex;
+        align-items: center;
+      }
+      .footer a:hover {
+        color: var(--color-action-primary);
+        text-decoration: underline;
+        text-underline-offset: 3px;
+      }
+
+      @media (max-width: 600px) {
+        .page {
+          padding: var(--space-8) var(--space-5) var(--space-6);
+          gap: var(--space-8);
+        }
+        .session {
+          padding: var(--space-4);
+        }
+      }
+
+      /* ============================================================
+         Sequential playback reveal — rows fade/slide in one by one
+         once the session enters the viewport. Stagger driven by
+         a per-child --i index set in JS.
+         ============================================================ */
+      .session > * {
+        opacity: 0;
+        transform: translateY(4px);
+        will-change: opacity, transform;
+      }
+      .session.is-playing > * {
+        animation: trace-row-in var(--motion-duration) var(--motion-ease)
+          forwards;
+        animation-delay: calc(var(--i, 0) * 120ms);
+      }
+
+      @keyframes trace-row-in {
+        from {
+          opacity: 0;
+          transform: translateY(4px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .session > * {
+          opacity: 1;
+          transform: none;
+        }
+        .session.is-playing > * {
+          animation: none;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <main class="page">
+      <!-- Brand -->
+      <a
+        href="https://github.com/honganh1206/tinker"
+        class="brand"
+        aria-label="tinker on GitHub"
+      >
+        <img src="./static/icon-192.png" alt="" class="brand__icon" />
+        <span class="brand__wordmark">Tinker</span>
+      </a>
+
+      <!-- Hero -->
+      <section class="hero">
+        <h1 class="hero__title">A background coding agent.</h1>
+        <p class="hero__lede">
+          Give it a prompt, walk away, get results.
+        </p>
+      </section>
+
+      <!-- Session replica -->
+      <section class="session" aria-label="Example tinker session">
+        <!-- System prompt (collapsed) -->
+        <div class="trace-row--system">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="m9 18 6-6-6-6" />
+          </svg>
+          system prompt · 1532 tokens
+        </div>
+
+        <!-- User message -->
+        <div class="msg-row is-user">
+          <div class="msg-avatar is-user" aria-hidden="true">YO</div>
+          <div class="msg-bubble is-user">
+            Check linting in agent/
+          </div>
+        </div>
+
+        <!-- Tool invocations -->
+        <div class="trace-row trace-row--tool">
+          <svg
+            class="trace-row__icon"
+            xmlns="http://www.w3.org/2000/svg"
+            width="13"
+            height="13"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path
+              d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"
+            />
+          </svg>
+          <div class="trace-row__body">bash({"command":"cd agent &amp;&amp; find . -name \"*.json\" | grep -E \"(eslint|package)\" | head -5 &amp;&amp; ls"})</div>
+        </div>
+
+        <div class="trace-row trace-row--tool">
+          <svg class="trace-row__icon" xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+          <div class="trace-row__body">bash({"command":"cd agent &amp;&amp; go vet ./... 2&gt;&amp;1; staticcheck ./... 2&gt;&amp;1; golangci-lint run ./... 2&gt;&amp;1"})</div>
+        </div>
+
+        <div class="trace-row trace-row--tool">
+          <svg class="trace-row__icon" xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+          <div class="trace-row__body">bash({"command":"grep -n \"RegisterTool\" agent/agent_test.go | head -10"})</div>
+        </div>
+
+        <div class="trace-row trace-row--tool">
+          <svg class="trace-row__icon" xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+          <div class="trace-row__body">bash({"command":"grep -rn \"func.*RegisterTool\" . 2&gt;/dev/null"})</div>
+        </div>
+
+        <div class="trace-row trace-row--tool">
+          <svg class="trace-row__icon" xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+          <div class="trace-row__body">read_file({"path":"agent/agent_test.go","start_line":1,"end_line":70})</div>
+        </div>
+
+        <div class="trace-row trace-row--tool">
+          <svg class="trace-row__icon" xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+          <div class="trace-row__body">read_file({"path":"model/contextwindow.go","start_line":155,"end_line":185})</div>
+        </div>
+
+        <div class="trace-row trace-row--tool">
+          <svg class="trace-row__icon" xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+          <div class="trace-row__body">bash({"command":"grep -n \"ToolDefinition\\|Function\\|Runner\" tools/tools.go 2&gt;/dev/null || grep -rn \"type ToolDefinition\" . 2&gt;/dev/null"})</div>
+        </div>
+
+        <div class="trace-row trace-row--tool">
+          <svg class="trace-row__icon" xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+          <div class="trace-row__body">read_file({"path":"tools/tools.go","start_line":22,"end_line":45})</div>
+        </div>
+
+        <div class="trace-row trace-row--tool">
+          <svg class="trace-row__icon" xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+          <div class="trace-row__body">edit_file({"path":"agent/agent_test.go","old_str":"\t// Register a simple test tool\n\ttestDef := tools.ToolDefinition{\n\t\tName: \"test_tool\",\n\t\tDescription: \"A test tool\",\n\t}\n\ttestRunner := &amp;mockToolR…<button class="trace-row__toggle" type="button">expand</button></div>
+        </div>
+
+        <div class="trace-row trace-row--tool">
+          <svg class="trace-row__icon" xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+          <div class="trace-row__body">bash({"command":"cd agent &amp;&amp; go vet ./... 2&gt;&amp;1"})</div>
+        </div>
+
+        <!-- Agent reply -->
+        <div class="msg-row">
+          <div class="msg-avatar is-agent" aria-hidden="true">
+            <img src="./static/icon-192.png" alt="" width="32" height="32" />
+          </div>
+          <div class="msg-bubble">
+            Fixed. <code>agent_test.go:42</code> was calling
+            <code>cw.RegisterTool(testDef, testRunner)</code> with two args, but
+            <code>RegisterTool</code> only accepts one. The runner is now
+            correctly set via <code>testDef.Function = testRunner.Run</code>.
+          </div>
+        </div>
+      </section>
+
+      <!-- Sequential playback reveal -->
+      <script>
+        (function () {
+          var session = document.querySelector(".session");
+          if (!session) return;
+
+          // Assign a stagger index to each top-level row.
+          var children = session.children;
+          for (var i = 0; i < children.length; i++) {
+            children[i].style.setProperty("--i", i);
+          }
+
+          // Respect reduced-motion: just reveal everything immediately.
+          var prefersReduced =
+            window.matchMedia &&
+            window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+          if (prefersReduced || !("IntersectionObserver" in window)) {
+            session.classList.add("is-playing");
+            return;
+          }
+
+          var observer = new IntersectionObserver(
+            function (entries) {
+              entries.forEach(function (entry) {
+                if (entry.isIntersecting) {
+                  session.classList.add("is-playing");
+                  observer.disconnect();
+                }
+              });
+            },
+            { threshold: 0.15 }
+          );
+          observer.observe(session);
+        })();
+      </script>
+
+      <!-- Footer -->
+      <footer class="footer">
+        <a
+          href="https://github.com/honganh1206/tinker"
+          aria-label="tinker on GitHub"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            aria-hidden="true"
+          >
+            <path
+              d="M12 .5C5.73.5.99 5.24.99 11.51c0 4.86 3.15 8.98 7.52 10.43.55.1.75-.24.75-.53 0-.26-.01-.95-.02-1.86-3.06.66-3.71-1.48-3.71-1.48-.5-1.27-1.22-1.61-1.22-1.61-1-.68.07-.67.07-.67 1.1.08 1.68 1.13 1.68 1.13.98 1.68 2.57 1.2 3.2.92.1-.71.38-1.2.69-1.48-2.44-.28-5.01-1.22-5.01-5.43 0-1.2.43-2.18 1.13-2.95-.11-.28-.49-1.4.11-2.92 0 0 .92-.29 3.02 1.13a10.5 10.5 0 0 1 5.5 0c2.1-1.42 3.02-1.13 3.02-1.13.6 1.52.22 2.64.11 2.92.7.77 1.13 1.75 1.13 2.95 0 4.22-2.58 5.15-5.03 5.42.39.34.74 1 .74 2.02 0 1.46-.01 2.64-.01 3 0 .29.2.64.76.53 4.36-1.46 7.51-5.58 7.51-10.43C23.01 5.24 18.27.5 12 .5z"
+            />
+          </svg>
+        </a>
+        <a href="https://justforfunnoreally.dev/">Just for fun, no really.</a>
+      </footer>
+    </main>
+  </body>
+</html>
