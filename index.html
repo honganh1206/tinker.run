@@ -137,33 +137,7 @@
         width: 24px;
         height: 24px;
         border-radius: var(--radius-md);
-        display: inline-grid;
-        place-items: center;
-        border: 1px solid var(--color-border-subtle);
-        background: var(--color-surface-base);
-        color: var(--blue-600);
-        position: relative;
-      }
-
-      .brand__mark::before,
-      .brand__mark::after {
-        content: "";
-        position: absolute;
-        border-radius: var(--radius-full);
-        background: currentColor;
-      }
-
-      .brand__mark::before {
-        width: 11px;
-        height: 2px;
-        transform: rotate(-35deg);
-      }
-
-      .brand__mark::after {
-        width: 4px;
-        height: 4px;
-        right: 5px;
-        bottom: 5px;
+        object-fit: cover;
       }
 
       .brand__wordmark {
@@ -411,34 +385,9 @@
       }
 
       .message-avatar__mark {
-        width: 22px;
-        height: 22px;
-        border-radius: var(--radius-md);
-        display: inline-grid;
-        place-items: center;
-        color: var(--blue-600);
-        position: relative;
-      }
-
-      .message-avatar__mark::before,
-      .message-avatar__mark::after {
-        content: "";
-        position: absolute;
-        border-radius: var(--radius-full);
-        background: currentColor;
-      }
-
-      .message-avatar__mark::before {
-        width: 12px;
-        height: 2px;
-        transform: rotate(-35deg);
-      }
-
-      .message-avatar__mark::after {
-        width: 4px;
-        height: 4px;
-        right: 3px;
-        bottom: 3px;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
       }
 
       .sidebar__title .brand__mark {
@@ -632,13 +581,9 @@
           class="brand"
           aria-label="Tinker on GitHub"
         >
-          <span class="brand__mark" aria-hidden="true"></span>
+          <img class="brand__mark" src="./static/icon-192.png" alt="" aria-hidden="true" />
           <span class="brand__wordmark">Tinker</span>
         </a>
-        <nav class="nav-actions" aria-label="Primary">
-          <a class="button" href="https://github.com/honganh1206/tinker">GitHub</a>
-          <a class="button" href="#demo">Demo</a>
-        </nav>
       </header>
 
       <section class="hero" aria-labelledby="hero-title">
@@ -657,7 +602,7 @@
         <aside class="panel sidebar" aria-label="Sessions">
           <div class="sidebar__header">
             <div class="sidebar__title">
-              <span class="brand__mark" aria-hidden="true"></span>
+              <img class="brand__mark" src="./static/icon-192.png" alt="" aria-hidden="true" />
               Tinker
             </div>
             <div class="sidebar__avatar" aria-hidden="true">YO</div>
@@ -723,7 +668,7 @@
 
               <div class="message" data-author="agent" style="--i: 7">
                 <div class="message-avatar" aria-hidden="true">
-                  <span class="message-avatar__mark"></span>
+                  <img class="message-avatar__mark" src="./static/icon-192.png" alt="" />
                 </div>
                 <div class="message-bubble">
                   Fixed. <code>agent_test.go</code> was calling <code>RegisterTool</code>
